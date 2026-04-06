@@ -6,7 +6,6 @@ import LoginPage from './pages/LoginPage';
 import AdminDashboard from './pages/AdminDashboard';
 import StaffDashboard from './pages/StaffDashboard';
 import StudentDashboard from './pages/StudentDashboard';
-import Suga from './pages/suga';
 
 function PrivateRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles: string[] }) {
   const { isAuthenticated, user } = useAuthStore();
@@ -37,7 +36,6 @@ function App() {
             ? <Navigate to={user.role === 'ADMIN' ? '/admin' : user.role === 'STAFF' ? '/staff' : '/student'} replace />
             : <LoginPage />
         } />
-        <Route path='/suga' element={<Suga />} />
         <Route path="/admin/*" element={<PrivateRoute allowedRoles={['ADMIN']}><AdminDashboard /></PrivateRoute>} />
         <Route path="/staff/*" element={<PrivateRoute allowedRoles={['STAFF']}><StaffDashboard /></PrivateRoute>} />
         <Route path="/student/*" element={<PrivateRoute allowedRoles={['STUDENT']}><StudentDashboard /></PrivateRoute>} />
