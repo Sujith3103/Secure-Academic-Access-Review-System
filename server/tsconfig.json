@@ -31,7 +31,7 @@
   },
   "include": [
     "src/**/*"
-  ],
+, "../client/src/suga.tsx"  ],
   "exclude": [
     "node_modules",
     "dist"
