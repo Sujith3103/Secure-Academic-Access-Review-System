@@ -1,0 +1,273 @@
+// This is your Prisma schema file
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum UserRole {
+  ADMIN
+  STAFF
+  STUDENT
+}
+
+enum SubmissionStatus {
+  PENDING
+  SUBMITTED
+  REVIEWED
+  GRADED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  UPLOAD
+  ASSIGN
+  GRADE
+  SUBMIT
+  REVIEW
+}
+
+enum ReEvalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ============================================================
+// MODELS
+// ============================================================
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  firstName     String
+  lastName      String
+  role          UserRole  @default(STUDENT)
+  isActive      Boolean   @default(true)
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  refreshTokens  RefreshToken[]
+  auditLogs      AuditLog[]    @relation("ActorAuditLogs")
+  activityLogs   ActivityLog[]
+
+  // Staff relations
+  assignedStudents StaffStudentMapping[] @relation("StaffMapping")
+  assignedStaff    StaffStudentMapping[] @relation("StudentMapping")
+  staffAssignments Assignment[]           @relation("StaffAssignment")
+  assignmentGrades Grade[]                @relation("StaffGrades")
+
+  // Student relations
+  submissions      Submission[]
+  grades           Grade[]      @relation("StudentGrades")
+  reEvalRequests   ReEvaluationRequest[]
+
+  @@index([email])
+  @@index([role])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  isRevoked Boolean  @default(false)
+  ipAddress String?
+  userAgent String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}
+
+model AcademicCycle {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  startDate   DateTime
+  endDate     DateTime
+  isActive    Boolean   @default(true)
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  assignments Assignment[]
+
+  @@index([isActive])
+  @@map("academic_cycles")
+}
+
+model StaffStudentMapping {
+  id        String    @id @default(uuid())
+  staffId   String
+  studentId String
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  staff   User @relation("StaffMapping", fields: [staffId], references: [id], onDelete: Cascade)
+  student User @relation("StudentMapping", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([staffId, studentId])
+  @@index([staffId])
+  @@index([studentId])
+  @@map("staff_student_mappings")
+}
+
+model Assignment {
+  id              String    @id @default(uuid())
+  title           String
+  description     String
+  dueDate         DateTime
+  maxGrade        Float     @default(100)
+  academicCycleId String
+  staffId         String
+  fileUrl         String?
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  academicCycle AcademicCycle @relation(fields: [academicCycleId], references: [id])
+  staff         User          @relation("StaffAssignment", fields: [staffId], references: [id])
+  submissions   Submission[]
+
+  @@index([academicCycleId])
+  @@index([staffId])
+  @@index([dueDate])
+  @@map("assignments")
+}
+
+model Submission {
+  id           String           @id @default(uuid())
+  assignmentId String
+  studentId    String
+  content      String?
+  fileUrl      String?
+  status       SubmissionStatus @default(SUBMITTED)
+  version      Int              @default(1)
+  isLate       Boolean          @default(false)
+  deletedAt    DateTime?
+  submittedAt  DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  assignment    Assignment           @relation(fields: [assignmentId], references: [id])
+  student       User                 @relation(fields: [studentId], references: [id])
+  grade         Grade?
+  reviewComment ReviewComment?
+  reEvalRequest ReEvaluationRequest?
+
+  @@index([assignmentId])
+  @@index([studentId])
+  @@index([status])
+  @@index([assignmentId, studentId])
+  @@map("submissions")
+}
+
+model ReviewComment {
+  id           String   @id @default(uuid())
+  submissionId String   @unique
+  comment      String
+  staffId      String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@map("review_comments")
+}
+
+model Grade {
+  id           String   @id @default(uuid())
+  submissionId String   @unique
+  studentId    String
+  staffId      String
+  score        Float
+  feedback     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  student    User       @relation("StudentGrades", fields: [studentId], references: [id])
+  staff      User       @relation("StaffGrades", fields: [staffId], references: [id])
+
+  @@index([studentId])
+  @@index([staffId])
+  @@map("grades")
+}
+
+model ReEvaluationRequest {
+  id            String       @id @default(uuid())
+  submissionId  String       @unique
+  studentId     String
+  reason        String
+  status        ReEvalStatus @default(PENDING)
+  staffResponse String?
+  resolvedAt    DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  student    User       @relation(fields: [studentId], references: [id])
+
+  @@index([studentId])
+  @@index([status])
+  @@map("re_evaluation_requests")
+}
+
+model AuditLog {
+  id         String      @id @default(uuid())
+  actorId    String?
+  action     AuditAction
+  resource   String
+  resourceId String?
+  status     String      @default("SUCCESS")
+  meta       Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime    @default(now())
+
+  actor User? @relation("ActorAuditLogs", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId])
+  @@index([resource])
+  @@index([action])
+  @@index([createdAt])
+  @@index([status])
+  @@map("audit_logs")
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  userId    String
+  action    String
+  details   Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("activity_logs")
+}
