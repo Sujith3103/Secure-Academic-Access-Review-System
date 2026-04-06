@@ -34,7 +34,7 @@ app.use(helmet({
 // ── CORS ──────────────────────────────────────────────────────────────
 app.use(cors({
     origin: (origin, callback) => {
-        const allowedOrigins = [env.CLIENT_URL, 'http://localhost:5173', 'http://localhost:3000','secure-academic-access-review-system-ilws4hfbq.vercel.app'];
+        const allowedOrigins = [env.CLIENT_URL, 'http://localhost:5173', 'http://localhost:3000','secure-academic-access-review-syste.vercel.app'];
         if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
