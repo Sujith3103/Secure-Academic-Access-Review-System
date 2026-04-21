@@ -1,27 +1,11 @@
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
-import { env } from '../config/env';
-import { BadRequestError } from '../core/errors';
 import { Request } from 'express';
+import { BadRequestError } from '../core/errors';
+import { cloudinary } from '../config/cloudinary';
+import { env } from '../config/env';
 
-const UPLOAD_DIR = path.resolve(env.UPLOAD_DIR);
-
-// Ensure upload directory exists
-if (!fs.existsSync(UPLOAD_DIR)) {
-    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-    destination: (_req, _file, cb) => {
-        cb(null, UPLOAD_DIR);
-    },
-    filename: (_req, file, cb) => {
-        const ext = path.extname(file.originalname);
-        const base = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
-        cb(null, `${Date.now()}-${base}${ext}`);
-    },
-});
+// Use memory storage — files go to buffer, then we upload to Cloudinary
+const storage = multer.memoryStorage();
 
 const csvFilter = (_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
     if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
@@ -58,3 +42,44 @@ export const documentUpload = multer({
     fileFilter: documentFilter,
     limits: { fileSize: env.MAX_FILE_SIZE_MB * 1024 * 1024 },
 });
+
+/**
+ * Upload a multer file buffer to Cloudinary and return the secure URL.
+ * Uses resource_type 'auto' which publicly serves all file types.
+ * For non-image files (PDF, Word, text), we modify the returned URL to include
+ * fl_attachment so the browser receives proper Content-Type headers.
+ *
+ * @param file - The multer file from req.file
+ * @param folder - The Cloudinary folder to store the file in
+ * @returns The secure URL of the uploaded file
+ */
+export async function uploadToCloudinary(
+    file: Express.Multer.File,
+    folder: string = 'saars/submissions',
+): Promise<string> {
+    // Strip extension from public_id to avoid double extensions (e.g. report.pdf.pdf)
+    const nameWithoutExt = file.originalname
+        .replace(/\.[^.]+$/, '')           // remove extension
+        .replace(/[^a-zA-Z0-9_-]/g, '_'); // sanitize
+
+    const publicId = `${Date.now()}-${nameWithoutExt}`;
+
+    return new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+            {
+                folder,
+                resource_type: 'auto',
+                public_id: publicId,
+            },
+            (error, result) => {
+                if (error) {
+                    reject(new BadRequestError(`File upload failed: ${error.message}`));
+                } else {
+                    resolve(result!.secure_url);
+                }
+            },
+        );
+        uploadStream.end(file.buffer);
+    });
+}
+

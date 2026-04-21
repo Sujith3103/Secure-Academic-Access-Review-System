@@ -7,6 +7,7 @@ import { parsePagination, buildPaginationMeta } from '../../shared/pagination';
 import { getOrSet } from '../../shared/cache';
 import { REDIS_KEYS, CACHE_TTL } from '../../config/redis';
 import { AuditAction, SubmissionStatus, ReEvalStatus } from '@prisma/client';
+import { uploadToCloudinary } from '../../middleware/upload';
 
 export class StudentController {
     // ── View Assigned Staff ────────────────────────────────────────────
@@ -105,6 +106,12 @@ export class StudentController {
 
             const nextVersion = latestSubmission ? latestSubmission.version + 1 : 1;
 
+            // Upload file to Cloudinary if provided
+            let fileUrl: string | undefined;
+            if (req.file) {
+                fileUrl = await uploadToCloudinary(req.file, 'saars/submissions');
+            }
+
             const submission = await prisma.submission.create({
                 data: {
                     assignmentId,
@@ -113,7 +120,7 @@ export class StudentController {
                     status: SubmissionStatus.SUBMITTED,
                     version: nextVersion,
                     isLate,
-                    fileUrl: req.file ? `/uploads/${req.file.filename}` : undefined,
+                    fileUrl,
                 },
             });
 

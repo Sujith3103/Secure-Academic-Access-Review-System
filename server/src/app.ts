@@ -15,6 +15,7 @@ import authRoutes from './modules/auth/auth.routes';
 import adminRoutes from './modules/admin/admin.routes';
 import staffRoutes from './modules/staff/staff.routes';
 import studentRoutes from './modules/student/student.routes';
+import fileRoutes from './modules/files/files.routes';
 
 const app = express();
 
@@ -34,7 +35,7 @@ app.use(helmet({
 // ── CORS ──────────────────────────────────────────────────────────────
 app.use(cors({
     origin: (origin, callback) => {
-        const allowedOrigins = [env.CLIENT_URL, 'http://localhost:5173', 'http://localhost:3000','https://secure-academic-access-review-syste.vercel.app'];
+        const allowedOrigins = [env.CLIENT_URL, 'http://localhost:5173', 'http://localhost:3000', 'https://secure-academic-access-review-syste.vercel.app','http://localhost:5174'];
         if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
@@ -84,6 +85,7 @@ app.use(`${env.API_PREFIX}/auth`, authRoutes);
 app.use(`${env.API_PREFIX}/admin`, adminRoutes);
 app.use(`${env.API_PREFIX}/staff`, staffRoutes);
 app.use(`${env.API_PREFIX}/student`, studentRoutes);
+app.use(`${env.API_PREFIX}/files`, fileRoutes);
 
 // ── Error Handling ────────────────────────────────────────────────────
 app.use(notFoundHandler);

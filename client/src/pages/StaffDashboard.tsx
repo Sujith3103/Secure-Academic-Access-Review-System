@@ -27,6 +27,7 @@ const StaffDashboard: React.FC = () => {
     const [reviewComment, setReviewComment] = useState('');
     const [reEvalResolveModal, setReEvalResolveModal] = useState<ReEvalRequest | null>(null);
     const [reEvalResolveForm, setReEvalResolveForm] = useState({ status: 'APPROVED' as 'APPROVED' | 'REJECTED', staffResponse: '', newScore: '', newFeedback: '' });
+    const [viewModal, setViewModal] = useState<Submission | null>(null);
     const [assignmentForm, setAssignmentForm] = useState({
         title: '', description: '', dueDate: '', maxGrade: 100, academicCycleId: '',
     });
@@ -277,6 +278,7 @@ const StaffDashboard: React.FC = () => {
                                                         <td>{s.grade ? <span className="font-medium" style={{ color: 'var(--green)' }}>{s.grade.score}</span> : <span className="text-muted">—</span>}</td>
                                                         <td>
                                                             <div className="flex gap-2">
+                                                                <button className="btn-ghost btn-sm" style={{ color: 'var(--blue)' }} onClick={() => setViewModal(s)}>👁 View</button>
                                                                 <button className="btn-ghost btn-sm" onClick={() => { setReviewModal(s.id); setReviewComment(s.reviewComment?.comment ?? ''); }}>Review</button>
                                                                 <button className="btn-accent btn-sm" onClick={() => { setGradeModal({ submissionId: s.id, maxGrade: assignments.find(a => a.id === selectedAssignment)?.maxGrade ?? 100 }); setGradeForm({ score: String(s.grade?.score ?? ''), feedback: s.grade?.feedback ?? '' }); }}>Grade</button>
                                                             </div>
@@ -393,6 +395,109 @@ const StaffDashboard: React.FC = () => {
                         <div className="modal-actions mt-6">
                             <button className="btn-secondary" onClick={() => setReEvalResolveModal(null)}>Cancel</button>
                             <button className="btn-primary" onClick={handleResolveReEval}>{reEvalResolveForm.status === 'APPROVED' ? 'Approve & Update' : 'Reject'}</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* View Submission Modal */}
+            {viewModal && (
+                <div className="modal-overlay" onClick={() => setViewModal(null)}>
+                    <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+                        <h2 className="modal-title">📄 View Submission</h2>
+                        <div style={{ marginTop: '1rem' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+                                <div>
+                                    <span className="text-sm text-muted">Student</span>
+                                    <p className="font-medium">{viewModal.student.firstName} {viewModal.student.lastName}</p>
+                                </div>
+                                <div>
+                                    <span className="text-sm text-muted">Email</span>
+                                    <p className="font-medium">{viewModal.student.email}</p>
+                                </div>
+                                <div>
+                                    <span className="text-sm text-muted">Status</span>
+                                    <p><span className={`badge badge-${viewModal.status.toLowerCase()}`}>{viewModal.status}</span>{viewModal.isLate && <span className="badge badge-late ml-1">Late</span>}</p>
+                                </div>
+                                <div>
+                                    <span className="text-sm text-muted">Version</span>
+                                    <p className="font-medium">v{viewModal.version ?? 1}</p>
+                                </div>
+                                <div>
+                                    <span className="text-sm text-muted">Submitted At</span>
+                                    <p className="font-medium">{new Date(viewModal.submittedAt).toLocaleString()}</p>
+                                </div>
+                                {viewModal.grade && (
+                                    <div>
+                                        <span className="text-sm text-muted">Grade</span>
+                                        <p className="font-medium" style={{ color: 'var(--green)' }}>{viewModal.grade.score}</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {viewModal.content && (
+                                <div style={{ marginBottom: '1rem' }}>
+                                    <span className="text-sm text-muted" style={{ display: 'block', marginBottom: '0.5rem' }}>Written Content</span>
+                                    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', whiteSpace: 'pre-wrap', fontSize: '0.9rem', maxHeight: '300px', overflowY: 'auto' }}>
+                                        {viewModal.content}
+                                    </div>
+                                </div>
+                            )}
+
+                            {viewModal.fileUrl && (
+                                <div style={{ marginBottom: '1rem' }}>
+                                    <span className="text-sm text-muted" style={{ display: 'block', marginBottom: '0.5rem' }}>Attached File</span>
+                                    {(() => {
+                                        const url = viewModal.fileUrl!;
+                                        const apiBase = import.meta.env.VITE_API_URL ?? 'http://localhost:5000/api/v1';
+                                        const proxyUrl = `${apiBase}/files/view?url=${encodeURIComponent(url)}`;
+                                        const isImage = /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(url);
+
+                                        if (isImage) {
+                                            return (
+                                                <div>
+                                                    <img src={url} alt="Submission attachment" style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '0.5rem', border: '1px solid var(--border)', objectFit: 'contain' }} />
+                                                    <div style={{ marginTop: '0.5rem' }}>
+                                                        <a href={url} target="_blank" rel="noopener noreferrer" className="btn-ghost btn-sm" style={{ textDecoration: 'none' }}>🔗 Open Full Size</a>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+
+                                        // PDFs, Word docs, text files — use server proxy
+                                        return (
+                                            <a
+                                                href={proxyUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="btn-primary"
+                                                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none' }}
+                                            >
+                                                📄 Open File
+                                            </a>
+                                        );
+                                    })()}
+                                </div>
+                            )}
+
+                            {!viewModal.content && !viewModal.fileUrl && (
+                                <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                                    <p>No content or file was submitted.</p>
+                                </div>
+                            )}
+
+                            {viewModal.reviewComment && (
+                                <div style={{ marginBottom: '1rem' }}>
+                                    <span className="text-sm text-muted" style={{ display: 'block', marginBottom: '0.5rem' }}>Review Comment</span>
+                                    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', fontStyle: 'italic' }}>
+                                        {viewModal.reviewComment.comment}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        <div className="modal-actions mt-6">
+                            <button className="btn-secondary" onClick={() => setViewModal(null)}>Close</button>
+                            <button className="btn-ghost btn-sm" onClick={() => { setReviewModal(viewModal.id); setReviewComment(viewModal.reviewComment?.comment ?? ''); setViewModal(null); }}>✍ Review</button>
+                            <button className="btn-accent btn-sm" onClick={() => { setGradeModal({ submissionId: viewModal.id, maxGrade: assignments.find(a => a.id === selectedAssignment)?.maxGrade ?? 100 }); setGradeForm({ score: String(viewModal.grade?.score ?? ''), feedback: viewModal.grade?.feedback ?? '' }); setViewModal(null); }}>🏆 Grade</button>
                         </div>
                     </div>
                 </div>

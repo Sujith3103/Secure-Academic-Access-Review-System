@@ -8,7 +8,7 @@ import { getOrSet, invalidateCache, invalidateCacheByPattern } from '../../share
 import { REDIS_KEYS, CACHE_TTL } from '../../config/redis';
 import { AuditAction, UserRole } from '@prisma/client';
 import { parse as csvParse } from 'csv-parse/sync';
-import fs from 'fs';
+
 import { AuthService } from '../../services/auth.service';
 
 export class AdminController {
@@ -179,7 +179,7 @@ export class AdminController {
         try {
             if (!req.file) throw new BadRequestError('CSV file is required');
 
-            const csvContent = fs.readFileSync(req.file.path, 'utf-8');
+            const csvContent = req.file.buffer.toString('utf-8');
             const records = csvParse(csvContent, {
                 columns: true,
                 skip_empty_lines: true,
@@ -218,8 +218,7 @@ export class AdminController {
                 });
             }
 
-            // Clean up temp file
-            fs.unlinkSync(req.file.path);
+
 
             await logAudit({
                 actorId: req.user!.id,
