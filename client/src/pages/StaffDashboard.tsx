@@ -446,36 +446,15 @@ const StaffDashboard: React.FC = () => {
                             {viewModal.fileUrl && (
                                 <div style={{ marginBottom: '1rem' }}>
                                     <span className="text-sm text-muted" style={{ display: 'block', marginBottom: '0.5rem' }}>Attached File</span>
-                                    {(() => {
-                                        const url = viewModal.fileUrl!;
-                                        const apiBase = import.meta.env.VITE_API_URL ?? 'http://localhost:5000/api/v1';
-                                        const proxyUrl = `${apiBase}/files/view?url=${encodeURIComponent(url)}`;
-                                        const isImage = /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(url);
-
-                                        if (isImage) {
-                                            return (
-                                                <div>
-                                                    <img src={url} alt="Submission attachment" style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '0.5rem', border: '1px solid var(--border)', objectFit: 'contain' }} />
-                                                    <div style={{ marginTop: '0.5rem' }}>
-                                                        <a href={url} target="_blank" rel="noopener noreferrer" className="btn-ghost btn-sm" style={{ textDecoration: 'none' }}>🔗 Open Full Size</a>
-                                                    </div>
-                                                </div>
-                                            );
-                                        }
-
-                                        // PDFs, Word docs, text files — use server proxy
-                                        return (
-                                            <a
-                                                href={proxyUrl}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="btn-primary"
-                                                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none' }}
-                                            >
-                                                📄 Open File
-                                            </a>
-                                        );
-                                    })()}
+                                    <a
+                                        href={`${import.meta.env.VITE_API_URL ?? 'http://localhost:5000/api/v1'}/files/view/${viewModal.fileUrl}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="btn-primary"
+                                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none' }}
+                                    >
+                                        📄 Open PDF
+                                    </a>
                                 </div>
                             )}
 

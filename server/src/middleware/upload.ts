@@ -1,11 +1,61 @@
 import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 import { Request } from 'express';
 import { BadRequestError } from '../core/errors';
-import { cloudinary } from '../config/cloudinary';
 import { env } from '../config/env';
 
-// Use memory storage — files go to buffer, then we upload to Cloudinary
-const storage = multer.memoryStorage();
+// ── Submission uploads (PDFs only) ──────────────────────────────────────
+const SUBMISSIONS_DIR = path.resolve('uploads/submissions');
+
+// Ensure directory exists
+if (!fs.existsSync(SUBMISSIONS_DIR)) {
+    fs.mkdirSync(SUBMISSIONS_DIR, { recursive: true });
+}
+
+const submissionStorage = multer.diskStorage({
+    destination: (_req, _file, cb) => {
+        cb(null, SUBMISSIONS_DIR);
+    },
+    filename: (req, file, cb) => {
+        const userId = req.user?.id || 'unknown';
+        const timestamp = Date.now();
+        const ext = path.extname(file.originalname);
+        cb(null, `${timestamp}-${userId}${ext}`);
+    },
+});
+
+const pdfFilter = (_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+    if (file.mimetype === 'application/pdf') {
+        cb(null, true);
+    } else {
+        cb(new BadRequestError('Only PDF files are allowed for submissions'));
+    }
+};
+
+export const submissionUpload = multer({
+    storage: submissionStorage,
+    fileFilter: pdfFilter,
+    limits: { fileSize: env.MAX_FILE_SIZE_MB * 1024 * 1024 },
+});
+
+// ── CSV uploads (for admin bulk onboarding) ─────────────────────────────
+const CSV_DIR = path.resolve('uploads/csv');
+
+if (!fs.existsSync(CSV_DIR)) {
+    fs.mkdirSync(CSV_DIR, { recursive: true });
+}
+
+const csvStorage = multer.diskStorage({
+    destination: (_req, _file, cb) => {
+        cb(null, CSV_DIR);
+    },
+    filename: (_req, file, cb) => {
+        const ext = path.extname(file.originalname);
+        const base = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
+        cb(null, `${Date.now()}-${base}${ext}`);
+    },
+});
 
 const csvFilter = (_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
     if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
@@ -15,71 +65,8 @@ const csvFilter = (_req: Request, file: Express.Multer.File, cb: multer.FileFilt
     }
 };
 
-const documentFilter = (_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-    const allowedMimes = [
-        'application/pdf',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'image/jpeg',
-        'image/png',
-        'text/plain',
-    ];
-    if (allowedMimes.includes(file.mimetype)) {
-        cb(null, true);
-    } else {
-        cb(new BadRequestError('File type not allowed. Allowed: PDF, Word, images, text files'));
-    }
-};
-
 export const csvUpload = multer({
-    storage,
+    storage: csvStorage,
     fileFilter: csvFilter,
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max for CSV
+    limits: { fileSize: 5 * 1024 * 1024 },
 });
-
-export const documentUpload = multer({
-    storage,
-    fileFilter: documentFilter,
-    limits: { fileSize: env.MAX_FILE_SIZE_MB * 1024 * 1024 },
-});
-
-/**
- * Upload a multer file buffer to Cloudinary and return the secure URL.
- * Uses resource_type 'auto' which publicly serves all file types.
- * For non-image files (PDF, Word, text), we modify the returned URL to include
- * fl_attachment so the browser receives proper Content-Type headers.
- *
- * @param file - The multer file from req.file
- * @param folder - The Cloudinary folder to store the file in
- * @returns The secure URL of the uploaded file
- */
-export async function uploadToCloudinary(
-    file: Express.Multer.File,
-    folder: string = 'saars/submissions',
-): Promise<string> {
-    // Strip extension from public_id to avoid double extensions (e.g. report.pdf.pdf)
-    const nameWithoutExt = file.originalname
-        .replace(/\.[^.]+$/, '')           // remove extension
-        .replace(/[^a-zA-Z0-9_-]/g, '_'); // sanitize
-
-    const publicId = `${Date.now()}-${nameWithoutExt}`;
-
-    return new Promise((resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream(
-            {
-                folder,
-                resource_type: 'auto',
-                public_id: publicId,
-            },
-            (error, result) => {
-                if (error) {
-                    reject(new BadRequestError(`File upload failed: ${error.message}`));
-                } else {
-                    resolve(result!.secure_url);
-                }
-            },
-        );
-        uploadStream.end(file.buffer);
-    });
-}
-

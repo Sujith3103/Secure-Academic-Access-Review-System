@@ -7,7 +7,6 @@ import { parsePagination, buildPaginationMeta } from '../../shared/pagination';
 import { getOrSet, invalidateCache, invalidateCacheByPattern } from '../../shared/cache';
 import { REDIS_KEYS, CACHE_TTL } from '../../config/redis';
 import { AuditAction, SubmissionStatus, ReEvalStatus } from '@prisma/client';
-import { uploadToCloudinary } from '../../middleware/upload';
 
 export class StaffController {
     // ── View Assigned Students ─────────────────────────────────────────
@@ -43,11 +42,8 @@ export class StaffController {
                 title: string; description: string; dueDate: string; maxGrade: number; academicCycleId: string;
             };
 
-            // Upload file to Cloudinary if provided
-            let fileUrl: string | undefined;
-            if (req.file) {
-                fileUrl = await uploadToCloudinary(req.file, 'saars/assignments');
-            }
+            // Store the uploaded file's name
+            const fileUrl = req.file ? req.file.filename : undefined;
 
             const assignment = await prisma.assignment.create({
                 data: {

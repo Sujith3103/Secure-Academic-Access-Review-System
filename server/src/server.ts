@@ -9,7 +9,7 @@ const PORT = env.PORT;
 async function bootstrap(): Promise<void> {
     try {
         logger.info('🚀 Starting SAARS API server...');
-
+ 
         await connectDatabase();
         await connectRedis();
 

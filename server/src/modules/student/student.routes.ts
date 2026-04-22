@@ -3,7 +3,7 @@ import { StudentController } from './student.controller';
 import { authenticate, requireRoles } from '../../middleware/auth';
 import { authorize } from '../../middleware/authorize';
 import { validateRequest } from '../../middleware/validate';
-import { documentUpload } from '../../middleware/upload';
+import { submissionUpload } from '../../middleware/upload';
 import { createSubmissionSchema, reEvaluationSchema } from './student.validator';
 import { UserRole } from '@prisma/client';
 
@@ -18,7 +18,7 @@ router.get('/my-staff', authorize('staff_student_mappings', 'read'), StudentCont
 router.get('/assignments', authorize('assignments', 'read'), StudentController.getMyAssignments);
 
 // ── Submissions ───────────────────────────────────────────────────────
-router.post('/submit', authorize('submissions', 'submit'), documentUpload.single('file'), validateRequest(createSubmissionSchema), StudentController.submitAssignment);
+router.post('/submit', authorize('submissions', 'submit'), submissionUpload.single('file'), validateRequest(createSubmissionSchema), StudentController.submitAssignment);
 router.get('/submissions', authorize('submissions', 'read'), StudentController.getMySubmissions);
 
 // ── Grades & Feedback ─────────────────────────────────────────────────
